@@ -1,4 +1,4 @@
-Shader "LiteRenderPipeline/Character/Body"
+Shader "LiteRenderPipeline/Character/Uber"
 {
     Properties
     {
@@ -103,19 +103,20 @@ Shader "LiteRenderPipeline/Character/Body"
         _StencilRefOverlay("Overlay Pass Stencil Reference", Range(0, 255)) = 0
         [Enum(UnityEngine.Rendering.CompareFunction)] _StencilCompOverlay("Overlay Pass Stencil Comparison", Int) = 0
     }
+
     SubShader
     {
-        Tags { "RenderType"="Opaque" 
-            "RenderPipeline" = "LiteRenderPipeline"
-            "LiteRPMaterialType" = "Lit"
-            "IgnoreProjector" = "True" }
-        LOD 100
-
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "RenderPipeline" = "UniversalPipeline"
+            "UniversalMaterialType" = "Lit"
+            "IgnoreProjector" = "True"
+        }
+        LOD 300
+        
         HLSLINCLUDE
-        #pragma shader_feature_local _AREA_FACE
-        #pragma shader_feature_local _AREA_HAIR
-        #pragma shader_feature_local _AREA_UPPERBODY
-        #pragma shader_feature_local _AREA_LOWERBODY
+        #pragma shader_feature_local _AREA_FACE _AREA_HAIR _AREA_UPPERBODY _AREA_LOWERBODY
         #pragma shader_feature_local _OUTLINE_ON
         #pragma shader_feature_local _OUTLINE_VERTEX_COLOR_SMOOTH_NORMAL
         #pragma shader_feature_local _DRAW_OVERLAY_ON
@@ -124,123 +125,16 @@ Shader "LiteRenderPipeline/Character/Body"
 
         Pass
         {
-            Name "ShadowCaster"
-            Tags{"LightMode" = "ShadowCaster"}
-            
-            ZWrite [_ZWrite]
-            ZTest LEqual
-            ColorMask 0
-            Cull [_Cull]
-            
-            HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
-
-            // -------------------------------------
-            // Material Keywords
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-
-            // -------------------------------------
-            // GPU Instancing
-            #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
-
-            // -------------------------------------
-            // Universal Pipeline Keywords
-            // This is used during shadow map generation to differentiate between directional and punctual light shadows, as they use different formulas to apply Normal Bias
-            #pragma multi_compile_vertex _ _CASTING_PUNCUAL_LIGHT_SHADOW
-
-            #pragma vertex ShadowPassVertex
-            #pragma fragment ShadowPassFragment
-
-            #include "Packages/com.unity.render-pipelines.universal//ShaderLibrary/Input.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-            ENDHLSL
-        }
-
-        Pass
-        {
-            Name "DepthOnly"
-            Tags{"LightMode" = "DepthOnly"}
-            
-            ZWrite [_ZWrite]
-            ColorMask 0
-            Cull [_Cull]
-            
-            HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
-
-            // -------------------------------------
-            // Material Keywords
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-
-            // -------------------------------------
-            // GPU Instancing
-            #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
-
-            // -------------------------------------
-            // Universal Pipeline Keywords
-
-            #pragma vertex DepthOnlyVertex
-            #pragma fragment DepthOnlyFragment
-
-            #include "Assets/LiteRP/Runtime/ShaderLibrary/LitInput.hlsl"
-            #include "Assets/LiteRP/Runtime/ShaderLibrary/DepthOnlyPass.hlsl"
-            ENDHLSL
-        }
-
-        /*Pass
-        {
-            Name "DepthNormals"
-            Tags{"LightMode" = "DepthNormals"}
-            
-            ZWrite [_ZWrite]
-            Cull [_Cull]
-            
-            HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
-
-            // -------------------------------------
-            // Material Keywords
-            #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local _PARALLAXMAP
-            #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-
-            // -------------------------------------
-            // GPU Instancing
-            #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
-
-            // -------------------------------------
-            // Universal Pipeline Keywords
-
-            #pragma vertex DepthNormalsVertex
-            #pragma fragment DepthNormalsFragment
-
-            #include "Assets/LiteRP/Runtime/ShaderLibrary/LitInput.hlsl"
-            #include "Assets/LiteRP/Runtime/ShaderLibrary/LitDepthNormalsPass.hlsl"
-            ENDHLSL
-        }*/
-
-        Pass
-        {
             Name "DrawCore"
             Tags
             {
-                "LightMode" = "LiteForward"
+                "LightMode" = "UniversalForward"
             }
             
-            Cull [_Cull]
             ZWrite [_ZWrite]
             Blend [_SrcBlendMode] [_DstBlendMode]
             BlendOp [_BlendOp]
+            Cull [_Cull]
             Stencil
             {
                 Ref [_StencilRef]
@@ -248,6 +142,43 @@ Shader "LiteRenderPipeline/Character/Body"
                 Pass [_StencilPassOp]
                 Fail [_StencilFailOp]
                 ZFail [_StencilZFailOp]
+            }
+
+            HLSLPROGRAM
+            #pragma target 3.5
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex DrawCoreVertex
+            #pragma fragment DrawCoreFragment
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma multi_compile _MAIN_LIGHT_SHADOWS
+            #pragma multi_compile _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _SHADOWS_SOFT
+            #pragma multi_compile_fog
+
+            #include "Input.hlsl"
+            #include "DrawCorePass.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DrawOverlay"
+            Tags
+            {
+                "LightMode" = "DrawOverlay"
+            }
+            Cull [_Cull]
+            ZWrite [_ZWrite]
+            Blend [_SrcBlendModeOverlay] [_DstBlendModeOverlay]
+            BlendOp [_BlendOpOverlay]
+            Stencil
+            {
+                Ref [_StencilRefOverlay]
+                Comp [_StencilCompOverlay]
             }
             
             HLSLPROGRAM
@@ -259,9 +190,192 @@ Shader "LiteRenderPipeline/Character/Body"
             #pragma vertex DrawCoreVertex
             #pragma fragment DrawCoreFragment
 
-            #include "SRUniversalInput.hlsl"
-            #include "SRuniversalDrawCorePass.hlsl"
+            #if _DRAW_OVERLAY_ON
+            #include "Input.hlsl"
+            #include "DrawCorePass.hlsl"
+            #else
+            struct Attributes{};
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+            };
+            Varyings DrawCoreVertex(Attributes input)
+            {
+                return (Varyings)0;
+            }
+            float4 DrawCoreFragment(Varyings input) : SV_TARGET
+            {
+                return 0;
+            }
+            #endif
+            
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DrawOutline"
+            Tags
+            {
+                "LightMode" = "UniversalForwardOnly"
+            }
+            Cull Front
+            ZWrite [_ZWrite]
+            
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+
+            #pragma multi_compile_fog
+
+            #if _OUTLINE_ON
+            #include "Input.hlsl"
+            #include "DrawOutlinePass.hlsl"
+            #else
+            struct Attributes{};
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+            };
+            Varyings vert(Attributes input)
+            {
+                return (Varyings)0;
+            }
+            float4 frag(Varyings input) : SV_TARGET
+            {
+                return 0;
+            }
+            #endif
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags
+            {
+                "LightMode" = "ShadowCaster"
+            }
+
+            // -------------------------------------
+            // Render State Commands
+            ZWrite [_ZWrite]
+            ZTest LEqual
+            ColorMask 0
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma target 4.5
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex ShadowPassVertex
+            #pragma fragment ShadowPassFragment
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+            
+            // This is used during shadow map generation to differentiate between directional and punctual light shadows, as they use different formulas to apply Normal Bias
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            // -------------------------------------
+            // Includes
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthOnly"
+            Tags
+            {
+                "LightMode" = "DepthOnly"
+            }
+
+            // -------------------------------------
+            // Render State Commands
+            ZWrite [_ZWrite]
+            ColorMask 0
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma target 4.5
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex DepthOnlyVertex
+            #pragma fragment DepthOnlyFragment
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+
+            // -------------------------------------
+            // Includes
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            ENDHLSL
+        }
+
+        // This pass is used when drawing to a _CameraNormalsTexture texture
+        Pass
+        {
+            Name "DepthNormals"
+            Tags
+            {
+                "LightMode" = "DepthNormals"
+            }
+
+            // -------------------------------------
+            // Render State Commands
+            ZWrite [_ZWrite]
+            Cull [_Cull]
+
+            HLSLPROGRAM
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma target 4.5
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex DepthNormalsVertex
+            #pragma fragment DepthNormalsFragment
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _PARALLAXMAP
+            #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+
+            // -------------------------------------
+            // Includes
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitDepthNormalsPass.hlsl"
             ENDHLSL
         }
     }
+
+    FallBack "Hidden/Universal Render Pipeline/FallbackError"
 }
